@@ -1,14 +1,13 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 
-// Terminal instructions
 const INSTRUCTIONS = `
 Welcome to AI Terminal Chat!
 
 • Start by typing: start ai
 • Then choose your model: use gemini or use perplexity
-• Now ask questions directly.
-• Switch models anytime with: use gemini or use perplexity
+• Ask questions directly.
+• Switch models anytime: use gemini | use perplexity
 `;
 
 const MODEL_NAMES = ["gemini", "perplexity"];
@@ -22,7 +21,6 @@ function App() {
 
   const parseInput = (raw) => {
     const trimmed = raw.trim();
-    // Check for "use model_name"
     const match = trimmed.match(/^use\s+(\w+)$/i);
     if (match && MODEL_NAMES.includes(match[1].toLowerCase())) {
       return { isSwitch: true, model: match[1].toLowerCase(), question: "" };
@@ -33,7 +31,6 @@ function App() {
   const handleSend = async () => {
     if (!input.trim() || isSending) return;
 
-    // Not started yet: only accept "start ai"
     if (!aiStarted) {
       if (input.trim().toLowerCase() === "start ai") {
         setAiStarted(true);
@@ -64,7 +61,6 @@ function App() {
 
     const { isSwitch, model, question } = parseInput(input);
 
-    // After "start ai", expect "use model_name" before queries
     if (!activeModel && !isSwitch) {
       setMessages((prev) => [
         ...prev,
@@ -73,7 +69,7 @@ function App() {
           role: "system",
           provider: "",
           content:
-            "❗ Please select a model first using: use gemini   or   use perplexity",
+            "❗ Please select a model first using: use gemini or use perplexity",
         },
       ]);
       setInput("");
@@ -166,15 +162,15 @@ function App() {
   return (
     <div className="min-h-screen bg-[#18181a] text-[#d1d5db] font-mono flex flex-col items-center">
       {/* Header */}
-      <div className="w-full max-w-2xl bg-[#232326] text-[#dbeafe] p-3 text-xs border-b border-[#2c2e33] uppercase mb-1 tracking-widest">
+      <div className="w-full sm:max-w-lg bg-[#232326] text-[#dbeafe] px-2 py-2 text-xs border-b border-[#2c2e33] uppercase mb-1 tracking-widest">
         AI Terminal Chat
       </div>
       {/* Instructions */}
-      <div className="w-full max-w-2xl bg-[#232326] text-[#9ca3af] p-3 border-b border-[#232326] mb-2 whitespace-pre-wrap text-xs">
+      <div className="w-full sm:max-w-lg bg-[#232326] text-[#9ca3af] px-2 py-3 border-b border-[#232326] mb-2 whitespace-pre-wrap text-sm leading-normal">
         {INSTRUCTIONS}
       </div>
       {/* Active model display */}
-      <div className="w-full max-w-2xl bg-[#232326] text-[#e0e7ef] p-2 text-sm border-b border-[#35363b] mb-2">
+      <div className="w-full sm:max-w-lg bg-[#232326] text-[#e0e7ef] px-2 py-2 text-sm border-b border-[#35363b] mb-2">
         <span>
           <span className="font-bold text-[#bae6fd]">Active Model:</span>{" "}
           <span className="bg-[#232326] rounded px-2 py-1 text-[#bae6fd] border border-[#2dd4bf]">
@@ -183,7 +179,7 @@ function App() {
         </span>
       </div>
       {/* Messages */}
-      <main className="w-full max-w-2xl flex-1 bg-[#18181a] px-2 pb-28 pt-2 flex flex-col">
+      <main className="w-full sm:max-w-lg flex-1 bg-[#18181a] px-1 pb-32 pt-2 flex flex-col">
         <div className="flex flex-col-reverse gap-3 overflow-y-auto">
           {messages
             .slice()
@@ -191,22 +187,22 @@ function App() {
             .map((msg) =>
               msg.role === "user" ? (
                 <div key={msg.id} className="mb-1">
-                  <div className="font-mono text-[#60a5fa] text-base">
+                  <div className="font-mono text-[#60a5fa] text-base break-words">
                     <span className="font-bold">{msg.provider}&gt;</span>{" "}
-                    <span className="">{msg.prompt}</span>
+                    <span>{msg.prompt}</span>
                   </div>
                 </div>
               ) : msg.role === "assistant" ? (
                 <div key={msg.id} className="mb-1">
-                  <div className="font-mono text-[#2dd4bf] text-base">
+                  <div className="font-mono text-[#2dd4bf] text-base break-words">
                     <span className="font-bold">{msg.provider}&gt;</span>{" "}
-                    <span className="">{msg.prompt}</span>
+                    <span>{msg.prompt}</span>
                   </div>
-                  <div className="ml-4 mt-1 p-3 bg-[#232326] rounded border border-[#35363b] text-[#d1d5db] text-base leading-relaxed">
+                  <div className="ml-2 mt-1 p-2 bg-[#232326] rounded border border-[#35363b] text-[#d1d5db] text-base leading-relaxed break-words">
                     <ReactMarkdown
                       components={{
                         p: ({ node, ...props }) => (
-                          <p className="whitespace-pre-wrap mb-4" {...props} />
+                          <p className="whitespace-pre-wrap mb-4 break-words" {...props} />
                         ),
                       }}
                     >
@@ -215,7 +211,7 @@ function App() {
                   </div>
                 </div>
               ) : (
-                <div key={msg.id} className="mb-1 font-mono text-[#fde68a] bg-[#232326] px-2 py-1 rounded">
+                <div key={msg.id} className="mb-1 font-mono text-[#fde68a] bg-[#232326] px-2 py-1 rounded break-words">
                   {msg.content}
                 </div>
               )
@@ -223,8 +219,8 @@ function App() {
         </div>
       </main>
       {/* Input bar */}
-      <div className="fixed inset-x-0 bottom-0 flex justify-center bg-[#18181a] py-4 border-t border-[#232326]">
-        <div className="w-full max-w-2xl flex items-center gap-2 px-2">
+      <div className="fixed inset-x-0 bottom-0 flex justify-center bg-[#18181a] py-3 border-t border-[#232326]">
+        <div className="w-full sm:max-w-lg flex items-center gap-2 px-2">
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -237,12 +233,15 @@ function App() {
                 ? `Type 'use gemini' or 'use perplexity'`
                 : `Ask your question...`
             }
-            className="flex-1 rounded bg-[#232326] border border-[#35363b] py-2 px-4 text-[#bae6fd] focus:outline-none focus:border-[#2dd4bf]"
+            className="flex-1 rounded bg-[#232326] border border-[#35363b] py-3 px-3 text-base text-[#bae6fd] focus:outline-none focus:border-[#2dd4bf]"
+            autoComplete="off"
+            style={{ minHeight: "44px" }}
           />
           <button
             onClick={handleSend}
             disabled={isSending || !input.trim()}
-            className="ml-2 px-4 py-2 rounded bg-[#2dd4bf] text-black font-bold hover:bg-[#22d3ee] transition"
+            className="ml-2 px-4 py-3 rounded bg-[#2dd4bf] text-black font-bold hover:bg-[#22d3ee] transition text-base"
+            style={{ minHeight: "44px" }}
           >
             Send
           </button>
