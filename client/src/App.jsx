@@ -1,40 +1,122 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 
+// Terminal instructions
+const INSTRUCTIONS = `
+Welcome to AI Terminal Chat!
+
+• Start by typing: start ai
+• Then choose your model: use gemini or use perplexity
+• Now ask questions directly.
+• Switch models anytime with: use gemini or use perplexity
+`;
+
+const MODEL_NAMES = ["gemini", "perplexity"];
+
 function App() {
-  const [provider, setProvider] = useState("gemini"); 
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
+  const [activeModel, setActiveModel] = useState("");
+  const [aiStarted, setAiStarted] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
-  const handleProviderChange = (value) => {
-    setProvider(value);
+  const parseInput = (raw) => {
+    const trimmed = raw.trim();
+    // Check for "use model_name"
+    const match = trimmed.match(/^use\s+(\w+)$/i);
+    if (match && MODEL_NAMES.includes(match[1].toLowerCase())) {
+      return { isSwitch: true, model: match[1].toLowerCase(), question: "" };
+    }
+    return { isSwitch: false, model: activeModel, question: trimmed };
   };
 
   const handleSend = async () => {
     if (!input.trim() || isSending) return;
 
-    const userMessage = {
-      id: Date.now(),
-      role: "user",
-      content: input.trim(),
-      provider,
-    };
+    // Not started yet: only accept "start ai"
+    if (!aiStarted) {
+      if (input.trim().toLowerCase() === "start ai") {
+        setAiStarted(true);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now(),
+            role: "system",
+            provider: "",
+            content: "✅ AI started. Select your model with 'use gemini' or 'use perplexity'.",
+          },
+        ]);
+        setInput("");
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now(),
+            role: "system",
+            provider: "",
+            content: "❗ To begin, type: start ai",
+          },
+        ]);
+        setInput("");
+      }
+      return;
+    }
 
-    setMessages((prev) => [...prev, userMessage]);
+    const { isSwitch, model, question } = parseInput(input);
+
+    // After "start ai", expect "use model_name" before queries
+    if (!activeModel && !isSwitch) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          role: "system",
+          provider: "",
+          content:
+            "❗ Please select a model first using: use gemini   or   use perplexity",
+        },
+      ]);
+      setInput("");
+      return;
+    }
+
+    if (isSwitch) {
+      setActiveModel(model);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          role: "system",
+          provider: model,
+          content: `🔄 Switched to ${model} model. All queries use ${model} until changed.`,
+        },
+      ]);
+      setInput("");
+      return;
+    }
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        role: "user",
+        provider: activeModel,
+        prompt: question,
+        content: `${activeModel}> ${question}`,
+      },
+    ]);
     setInput("");
     setIsSending(true);
 
     try {
-      const apiUrl =
-        provider === "gemini"
-          ? "http://localhost:5000/api/gemini-chat"
-          : "http://localhost:5000/api/perplexity-chat";
-
-      const body =
-        provider === "gemini"
-          ? { prompt: userMessage.content }
-          : { message: userMessage.content };
+      let apiUrl, body;
+      if (activeModel === "gemini") {
+        apiUrl = "http://localhost:5000/api/gemini-chat";
+        body = { prompt: question };
+      } else {
+        apiUrl = "http://localhost:5000/api/perplexity-chat";
+        body = { message: question };
+      }
 
       const res = await fetch(apiUrl, {
         method: "POST",
@@ -43,29 +125,30 @@ function App() {
       });
 
       const data = await res.json();
-
       const reply =
-        provider === "gemini"
+        activeModel === "gemini"
           ? data.text || "No response received."
           : data.reply || "No response received.";
 
-      const botMessage = {
-        id: Date.now() + 1,
-        role: "assistant",
-        content: reply,
-        provider,
-      };
-
-      setMessages((prev) => [...prev, botMessage]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          role: "assistant",
+          provider: activeModel,
+          prompt: question,
+          content: reply,
+        },
+      ]);
     } catch (err) {
-      console.error(err);
       setMessages((prev) => [
         ...prev,
         {
           id: Date.now() + 2,
           role: "assistant",
+          provider: activeModel,
+          prompt: question,
           content: "Something went wrong talking to the API.",
-          provider,
         },
       ]);
     } finally {
@@ -81,118 +164,88 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50 flex flex-col">
-      <header className="flex items-center justify-between px-8 py-4 text-sm text-slate-300/80">
-        <div className="font-semibold tracking-tight">AI Chat</div>
-        <nav className="flex gap-4 text-xs uppercase tracking-[0.18em] text-slate-400">
-          <span>MERN</span>
-          <span>Gemini</span>
-          <span>Perplexity</span>
-        </nav>
-      </header>
-
-      <main className="flex-1 flex flex-col items-center px-4 pb-40">
-        <div className="w-full max-w-3xl pt-10">
-          {messages.length === 0 && (
-            <div className="text-center text-sm text-slate-400 mb-8">
-              <p className="text-lg font-medium text-slate-100">
-                Start a conversation with your AI.
-              </p>
-              <p className="">
-                Use <span className="text-brand-soft font-semibold">Model</span>{" "}
-                toggle below to switch models.
-              </p>
-            </div>
-          )}
-
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex ${
-                  msg.role === "user" ? "justify-end" : "justify-start"
-                }`}
-              >
-                <div
-                  className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm shadow-md ${
-                    msg.role === "user"
-                      ? "bg-brand-soft/90 text-white shadow-glow-purple"
-                      : "bg-slate-800/80 border border-slate-700 text-slate-50"
-                  }`}
-                >
-                  <div className="text-[10px] uppercase tracking-[0.18em] mb-1 text-slate-300/70">
-                    {msg.role === "user"
-                      ? "You"
-                      : msg.provider === "gemini"
-                      ? "Gemini"
-                      : "Perplexity"}
+    <div className="min-h-screen bg-[#18181a] text-[#d1d5db] font-mono flex flex-col items-center">
+      {/* Header */}
+      <div className="w-full max-w-2xl bg-[#232326] text-[#dbeafe] p-3 text-xs border-b border-[#2c2e33] uppercase mb-1 tracking-widest">
+        AI Terminal Chat
+      </div>
+      {/* Instructions */}
+      <div className="w-full max-w-2xl bg-[#232326] text-[#9ca3af] p-3 border-b border-[#232326] mb-2 whitespace-pre-wrap text-xs">
+        {INSTRUCTIONS}
+      </div>
+      {/* Active model display */}
+      <div className="w-full max-w-2xl bg-[#232326] text-[#e0e7ef] p-2 text-sm border-b border-[#35363b] mb-2">
+        <span>
+          <span className="font-bold text-[#bae6fd]">Active Model:</span>{" "}
+          <span className="bg-[#232326] rounded px-2 py-1 text-[#bae6fd] border border-[#2dd4bf]">
+            {activeModel || "None (please start and select one)"}
+          </span>
+        </span>
+      </div>
+      {/* Messages */}
+      <main className="w-full max-w-2xl flex-1 bg-[#18181a] px-2 pb-28 pt-2 flex flex-col">
+        <div className="flex flex-col-reverse gap-3 overflow-y-auto">
+          {messages
+            .slice()
+            .reverse()
+            .map((msg) =>
+              msg.role === "user" ? (
+                <div key={msg.id} className="mb-1">
+                  <div className="font-mono text-[#60a5fa] text-base">
+                    <span className="font-bold">{msg.provider}&gt;</span>{" "}
+                    <span className="">{msg.prompt}</span>
                   </div>
-<ReactMarkdown
-  components={{
-    p: ({ node, ...props }) => (
-      <p className="whitespace-pre-wrap" {...props} />
-    ),
-  }}
->
-  {msg.content}
-</ReactMarkdown>
                 </div>
-              </div>
-            ))}
-          </div>
+              ) : msg.role === "assistant" ? (
+                <div key={msg.id} className="mb-1">
+                  <div className="font-mono text-[#2dd4bf] text-base">
+                    <span className="font-bold">{msg.provider}&gt;</span>{" "}
+                    <span className="">{msg.prompt}</span>
+                  </div>
+                  <div className="ml-4 mt-1 p-3 bg-[#232326] rounded border border-[#35363b] text-[#d1d5db] text-base leading-relaxed">
+                    <ReactMarkdown
+                      components={{
+                        p: ({ node, ...props }) => (
+                          <p className="whitespace-pre-wrap mb-4" {...props} />
+                        ),
+                      }}
+                    >
+                      {msg.content}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+              ) : (
+                <div key={msg.id} className="mb-1 font-mono text-[#fde68a] bg-[#232326] px-2 py-1 rounded">
+                  {msg.content}
+                </div>
+              )
+            )}
         </div>
       </main>
-
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 flex justify-center px-4 pb-6">
-        <div className="pointer-events-auto w-full max-w-4xl">
-          <div className="rounded-3xl bg-slate-900/70 border border-slate-700 shadow-[0_0_40px_rgba(124,58,237,0.4)] backdrop-blur-xl px-4 py-3 flex flex-col gap-2">
-            <div className="flex items-center gap-3 text-[11px] text-slate-300/80">
-              <span className="uppercase tracking-[0.2em] text-slate-400/80">
-                Model
-              </span>
-
-              <div className="inline-flex rounded-full bg-slate-800 p-1">
-                <button
-                  onClick={() => handleProviderChange("gemini")}
-                  className={`px-3 py-1 rounded-full text-xs ${
-                    provider === "gemini"
-                      ? "bg-brand text-white shadow-glow-purple"
-                      : "text-slate-300"
-                  }`}
-                >
-                  Gemini
-                </button>
-                <button
-                  onClick={() => handleProviderChange("perplexity")}
-                  className={`px-3 py-1 rounded-full text-xs ${
-                    provider === "perplexity"
-                      ? "bg-brand text-white shadow-glow-purple"
-                      : "text-slate-300"
-                  }`}
-                >
-                  Perplexity
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-end gap-3">
-              <textarea
-                rows={1}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Message AI Chat..."
-                className="flex-1 resize-none bg-transparent text-sm text-slate-100 placeholder:text-slate-500 outline-none max-h-32"
-              />
-              <button
-                onClick={handleSend}
-                disabled={isSending || !input.trim()}
-                className="h-10 w-10 flex items-center justify-center rounded-full bg-brand disabled:bg-slate-700 shadow-glow-purple"
-              >
-                ↑
-              </button>
-            </div>
-          </div>
+      {/* Input bar */}
+      <div className="fixed inset-x-0 bottom-0 flex justify-center bg-[#18181a] py-4 border-t border-[#232326]">
+        <div className="w-full max-w-2xl flex items-center gap-2 px-2">
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={isSending}
+            placeholder={
+              !aiStarted
+                ? `Type 'start ai' to begin...`
+                : !activeModel
+                ? `Type 'use gemini' or 'use perplexity'`
+                : `Ask your question...`
+            }
+            className="flex-1 rounded bg-[#232326] border border-[#35363b] py-2 px-4 text-[#bae6fd] focus:outline-none focus:border-[#2dd4bf]"
+          />
+          <button
+            onClick={handleSend}
+            disabled={isSending || !input.trim()}
+            className="ml-2 px-4 py-2 rounded bg-[#2dd4bf] text-black font-bold hover:bg-[#22d3ee] transition"
+          >
+            Send
+          </button>
         </div>
       </div>
     </div>
