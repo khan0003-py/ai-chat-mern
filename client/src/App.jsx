@@ -14,9 +14,10 @@ Welcome to AI Terminal Chat!
 const MODEL_NAMES = ["gemini", "perplexity"];
 
 function App() {
-  const [provider, setProvider] = useState("gemini"); 
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
+  const [activeModel, setActiveModel] = useState("");
+  const [aiStarted, setAiStarted] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
   const parseInput = (raw) => {
@@ -108,15 +109,14 @@ function App() {
     setIsSending(true);
 
     try {
-      const apiUrl =
-        provider === "gemini"
-          ? "http://localhost:5000/api/gemini-chat"
-          : "http://localhost:5000/api/perplexity-chat";
-
-      const body =
-        provider === "gemini"
-          ? { prompt: userMessage.content }
-          : { message: userMessage.content };
+      let apiUrl, body;
+      if (activeModel === "gemini") {
+        apiUrl = "http://localhost:5000/api/gemini-chat";
+        body = { prompt: question };
+      } else {
+        apiUrl = "http://localhost:5000/api/perplexity-chat";
+        body = { message: question };
+      }
 
       const res = await fetch(apiUrl, {
         method: "POST",
@@ -125,29 +125,30 @@ function App() {
       });
 
       const data = await res.json();
-
       const reply =
-        provider === "gemini"
+        activeModel === "gemini"
           ? data.text || "No response received."
           : data.reply || "No response received.";
 
-      const botMessage = {
-        id: Date.now() + 1,
-        role: "assistant",
-        content: reply,
-        provider,
-      };
-
-      setMessages((prev) => [...prev, botMessage]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          role: "assistant",
+          provider: activeModel,
+          prompt: question,
+          content: reply,
+        },
+      ]);
     } catch (err) {
-      console.error(err);
       setMessages((prev) => [
         ...prev,
         {
           id: Date.now() + 2,
           role: "assistant",
+          provider: activeModel,
+          prompt: question,
           content: "Something went wrong talking to the API.",
-          provider,
         },
       ]);
     } finally {
